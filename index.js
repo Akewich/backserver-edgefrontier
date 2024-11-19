@@ -9,7 +9,6 @@ if (!process.env.DB_URI || !process.env.PORT) {
 // Import necessary modules
 const express = require("express");
 const mongoose = require("mongoose");
-const Product = require("./models/productUse");
 const SensorData = require("./models/sensorRead"); // Import the sensor model
 const bodyParser = require("body-parser");
 
