@@ -17,9 +17,11 @@ const port = process.env.PORT; // Use environment port
 
 // import cors and enable cors for all routes
 const cors = require("cors");
+const User = require("./models/user");
 app.use(cors());
 const corsOptions = process.env.CORSOPTIONS;
 app.use(cors(corsOptions));
+
 // Connect to MongoDB
 mongoose
   .connect(process.env.DB_URI)
@@ -102,6 +104,78 @@ app.delete("/api/sensors/:id", async (req, res) => {
       error:
         process.env.NODE_ENV === "development" ? error.stack : error.message,
     });
+  }
+});
+
+// ------ Register ------
+app.post("/api/register", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Email and password are required." });
+    }
+
+    // Create new user
+    const newUser = await User.create({ email, password });
+
+    // Respond without sending the hashed password
+    res.status(201).json({
+      message: "User registered successfully",
+      user: { id: newUser._id, email: newUser.email },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Email already exists." });
+    }
+    console.error("Error during registration:", error);
+    res.status(500).json({ message: "Something went wrong." });
+  }
+});
+
+// ----- Login -----
+const jwt = require("jsonwebtoken"); // Import JWT for generating tokens
+const bcrypt = require("bcrypt");
+
+app.post("/api/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    // Validate inputs
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Email and password are required." });
+    }
+
+    // Find the user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password." });
+    }
+
+    // Compare the provided password with the stored hash
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: "Invalid email or password." });
+    }
+
+    // Generate a JWT token
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET, // Secret key from .env
+      { expiresIn: "1h" } // Token expiry (e.g., 1 hour)
+    );
+
+    // Respond with token
+    res.status(200).json({
+      message: "Login successful!",
+      token, // Include the token in the response
+      user: { id: user._id, email: user.email },
+    });
+  } catch (error) {
+    console.error("Error during login:", error);
+    res.status(500).json({ message: "Something went wrong." });
   }
 });
 
