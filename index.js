@@ -11,9 +11,36 @@ const express = require("express");
 const mongoose = require("mongoose");
 const SensorData = require("./models/sensorRead"); // Import the sensor model
 const bodyParser = require("body-parser");
-
 const app = express(); // Initialize express app
 const port = process.env.PORT; // Use environment port
+
+// Using Websocket
+const { WebSocket } = require("ws");
+const http = require("http");
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+wss.on("connection", function connection(ws) {
+  ws.on("message", function incoming(message) {
+    console.log("Connected!");
+  });
+
+  ws.on("close", () => {
+    console.log("Disconnected!");
+  });
+});
+
+const broadCastSensorData = (data) => {
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify(data));
+    }
+  });
+};
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server running on port ${port} Naja Jubjub`);
+});
 
 // import cors and enable cors for all routes
 const cors = require("cors");
@@ -45,6 +72,10 @@ app.get("/", (req, res) => {
 app.post("/api/sensors", async (req, res) => {
   try {
     const sensorData = await SensorData.create(req.body);
+
+    // Broadcast new sensor data to all connected Websocket
+    broadCastSensorData(sensorData);
+
     res
       .status(200)
       .json({ message: "Sensor data logged successfully!", data: sensorData });
@@ -177,9 +208,4 @@ app.post("/api/login", async (req, res) => {
     console.error("Error during login:", error);
     res.status(500).json({ message: "Something went wrong." });
   }
-});
-
-// Start the server
-app.listen(port, () => {
-  console.log(`Server running on port ${port} Naja Jubjub`);
 });
