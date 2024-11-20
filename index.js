@@ -12,7 +12,7 @@ const mongoose = require("mongoose");
 const SensorData = require("./models/sensorRead"); // Import the sensor model
 const bodyParser = require("body-parser");
 const app = express(); // Initialize express app
-const port = process.env.PORT; // Use environment port
+const port = process.env.PORT || 4000; // Use environment port
 
 // Using Websocket
 const { WebSocket } = require("ws");
@@ -29,13 +29,13 @@ wss.on("connection", function connection(ws) {
   });
 });
 
-const broadCastSensorData = (data) => {
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify(data));
-    }
-  });
-};
+// const broadCastSensorData = (data) => {
+//   wss.clients.forEach((client) => {
+//     if (client.readyState === WebSocket.OPEN) {
+//       client.send(JSON.stringify(data));
+//     }
+//   });
+// };
 
 // Start the server
 app.listen(port, () => {
@@ -74,7 +74,7 @@ app.post("/api/sensors", async (req, res) => {
     const sensorData = await SensorData.create(req.body);
 
     // Broadcast new sensor data to all connected Websocket
-    broadCastSensorData(sensorData);
+    // broadCastSensorData(sensorData);
 
     res
       .status(200)
@@ -92,6 +92,14 @@ app.get("/api/sensors", async (req, res) => {
   try {
     const sensorData = await SensorData.find();
     res.status(200).json(sensorData);
+    console.log("Data", sensorData);
+
+    // Showing data for user
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(sensorData));
+      }
+    });
   } catch (error) {
     res.status(500).json({
       message: "Error fetching sensor data",
@@ -168,6 +176,7 @@ app.post("/api/register", async (req, res) => {
 // ----- Login -----
 const jwt = require("jsonwebtoken"); // Import JWT for generating tokens
 const bcrypt = require("bcrypt");
+const { client } = require("websocket");
 
 app.post("/api/login", async (req, res) => {
   try {
